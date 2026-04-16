@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Portal</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #121212; color: white; }
+        button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 5px; transition: 0.2s; }
+        button:hover { background: #0051ad; }
+    </style>
+</head>
+<body>
+    <h1>Private Proxy</h1>
+    <button onclick="launch()">Launch about:blank Proxy</button>
+
+    <script>
+        function launch() {
+            const query = prompt("Enter your search:");
+            if (!query) return;
+
+            const win = window.open('about:blank', '_blank');
+            if (!win) {
+                alert("Pop-up blocked! Please allow pop-ups for this site.");
+                return;
+            }
+
+            const proxyUrl = window.location.origin + "/api/proxy?q=" + encodeURIComponent(query);
+            
+            win.document.body.style.margin = '0';
+            win.document.body.style.padding = '0';
+            win.document.body.style.height = '100vh';
+            win.document.title = "Search";
+
+            const iframe = win.document.createElement('iframe');
+            iframe.src = proxyUrl;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.overflow = 'hidden';
+
+            win.document.body.appendChild(iframe);
+            
+            // Optional: Redirect original page to google.com to hide the launcher
+            // window.location.href = "https://www.google.com";
+        }
+    </script>
+</body>
+</html>
