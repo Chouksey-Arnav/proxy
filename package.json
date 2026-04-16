@@ -1,12 +1,8 @@
 {
   "name": "privacy-proxy",
   "version": "1.0.0",
-  "description": "Personal private search proxy via DuckDuckGo on Vercel",
   "private": true,
   "engines": {
     "node": "18.x"
-  },
-  "scripts": {
-    "dev": "vercel dev"
   }
 }
