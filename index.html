@@ -4,42 +4,44 @@
     <title>Search Portal</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #121212; color: white; }
-        button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 5px; transition: 0.2s; }
-        button:hover { background: #0051ad; }
+        h1 { margin-bottom: 20px; font-weight: 300; }
+        button { padding: 15px 35px; font-size: 1.2rem; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 8px; transition: 0.3s; box-shadow: 0 4px 14px 0 rgba(0,118,255,0.39); }
+        button:hover { background: #0051ad; transform: translateY(-2px); }
     </style>
 </head>
 <body>
-    <h1>Private Proxy</h1>
-    <button onclick="launch()">Launch about:blank Proxy</button>
+    <h1>Private Search Proxy</h1>
+    <button onclick="launch()">Launch Cloaked Search</button>
 
     <script>
         function launch() {
-            const query = prompt("Enter your search:");
+            const query = prompt("What are you looking for?");
             if (!query) return;
 
+            // 1. Open the about:blank tab
             const win = window.open('about:blank', '_blank');
             if (!win) {
-                alert("Pop-up blocked! Please allow pop-ups for this site.");
+                alert("POP-UP BLOCKED! Look at your URL bar and click 'Allow pop-ups' to use this proxy.");
                 return;
             }
 
+            // 2. Build the URL to your Vercel API
             const proxyUrl = window.location.origin + "/api/proxy?q=" + encodeURIComponent(query);
             
+            // 3. Style the new tab and inject the iframe
             win.document.body.style.margin = '0';
-            win.document.body.style.padding = '0';
             win.document.body.style.height = '100vh';
-            win.document.title = "Search";
+            win.document.title = "New Tab"; // Generic title for history
 
             const iframe = win.document.createElement('iframe');
             iframe.src = proxyUrl;
             iframe.style.width = '100%';
             iframe.style.height = '100%';
             iframe.style.border = 'none';
-            iframe.style.overflow = 'hidden';
-
+            
             win.document.body.appendChild(iframe);
             
-            // Optional: Redirect original page to google.com to hide the launcher
+            // Optional: Hide the launcher page by sending it to Google
             // window.location.href = "https://www.google.com";
         }
     </script>
