@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<!-- FILE D: public/index.html -->
+<!-- ─────────────────────────────────────────────────────────────────────────
+  This is the ONLY static file the user sees. Vercel serves everything inside
+  /public/ as static assets. This file is available at the root URL ("/").
+
+  HOW THE ABOUT:BLANK CLOAK WORKS — full explanation:
+  ────────────────────────────────────────────────────
+  1. User clicks "Search" or presses Enter.
+  2. Our JS calls window.open("", "_blank") SYNCHRONOUSLY — before any async
+     code. This is the ONLY way to bypass popup blockers. Popup blockers
+     specifically allow window.open() when it is called directly inside a
+     user-initiated event (click, keydown). The moment you move window.open()
+     inside a .then() callback or setTimeout, the browser classifies it as
+     "not user-initiated" and blocks it.
+  3. The new window opens with URL "about:blank". The browser will never record
+     "about:blank" in the history. The history entry is based on the URL of the
+     tab — since the URL stays "about:blank" forever, nothing is recorded.
+  4. We immediately write a loading screen into the blank tab.
+  5. We fetch() our /api/proxy endpoint (same-origin, no CORS issues).
+  6. When the fetch resolves, we document.write() the real HTML into the tab.
+  7. The URL bar still shows "about:blank". History stays clean.
+  ────────────────────────────────────────────────────────────────────────── -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Prevent THIS page itself from being indexed or stored -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Cache-Control" content="no-store">
+
+  <title>Private Search</title>
+
+  <!-- Google Fonts — Syne for headings (geometric, distinctive), JetBrains Mono for UI labels -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset & Root Variables ─────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg:          #080b10;
+      --surface:     #0e1117;
+      --border:      #1e2533;
+      --border-focus:#2e3d58;
+      --text:        #c9d3e0;
+      --text-dim:    #4a5568;
+      --text-muted:  #2d3748;
+      --accent:      #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --accent-hover:#2563eb;
+      --warn-bg:     #1a1205;
+      --warn-border: #78350f;
+      --warn-text:   #fbbf24;
+      --mono:        'JetBrains Mono', monospace;
+      --display:     'Syne', sans-serif;
+    }
+
+    /* ── Body & Background ──────────────────────────────────────────────── */
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      font-family: var(--mono);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Subtle radial glow behind the search card */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(59, 130, 246, 0.05) 0%,
+        transparent 70%
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Subtle grid texture on background */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Main Container ─────────────────────────────────────────────────── */
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 580px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+
+    /* ── Status Pill ────────────────────────────────────────────────────── */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 14px;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: #60a5fa;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ── Heading ────────────────────────────────────────────────────────── */
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(2.4rem, 6vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      color: #f1f5f9;
+      margin-bottom: 0.6rem;
+    }
+
+    h1 .accent {
+      /* The word "PRIVATE" rendered in a gradient */
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.03em;
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+    }
+
+    /* ── Search Field ───────────────────────────────────────────────────── */
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      margin-bottom: 1rem;
+    }
+
+    .input-group {
+      position: relative;
+      flex: 1;
+    }
+
+    /* Lock icon inside the input */
+    .input-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+      font-size: 14px;
+      z-index: 1;
+    }
+
+    #searchInput {
+      width: 100%;
+      height: 52px;
+      padding: 0 16px 0 42px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      letter-spacing: 0.01em;
+    }
+
+    #searchInput::placeholder {
+      color: var(--text-dim);
+    }
+
+    #searchInput:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* ── Search Button ──────────────────────────────────────────────────── */
+    #searchBtn {
+      height: 52px;
+      padding: 0 22px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
+      white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #searchBtn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
+      border-radius: inherit;
+    }
+
+    #searchBtn:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.35);
+    }
+
+    #searchBtn:active {
+      transform: scale(0.97);
+    }
+
+    #searchBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Popup Blocked Warning ───────────────────────────────────────────── */
+    /* Hidden by default, shown via JS if window.open() was blocked */
+    .popup-notice {
+      display: none;
+      text-align: left;
+      padding: 14px 16px;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 10px;
+      font-size: 12px;
+      color: var(--warn-text);
+      line-height: 1.7;
+      margin-bottom: 1rem;
+    }
+
+    .popup-notice strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .popup-notice ol {
+      margin: 8px 0 10px 18px;
+      color: #d97706;
+    }
+
+    .popup-notice ol li {
+      margin-bottom: 3px;
+    }
+
+    #directLink {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 6px 14px;
+      background: #92400e;
+      color: #fef3c7;
+      border-radius: 7px;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 12px;
+      border: 1px solid #b45309;
+      transition: background 0.15s;
+    }
+
+    #directLink:hover {
+      background: #b45309;
+    }
+
+    /* ── Info Footer ────────────────────────────────────────────────────── */
+    .info-row {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 1.8rem;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+    }
+
+    .info-item .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+    }
+
+    /* ── Keyboard Hint ──────────────────────────────────────────────────── */
+    .kbd-hint {
+      margin-top: 0.8rem;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .kbd-hint kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 4px;
+      font-size: 10px;
+      font-family: var(--mono);
+      color: #4b5563;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <!-- Status pill with animated dot -->
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      Proxy active — zero history
+    </div>
+
+    <!-- Heading -->
+    <h1><span class="accent">PRIVATE</span><br>SEARCH</h1>
+    <p class="subtitle">
+      Results open in an <code>about:blank</code> tab.<br>
+      Your browser never records the URL — no history, no trace.
+    </p>
+
+    <!-- Popup blocked warning — hidden until needed -->
+    <div class="popup-notice" id="popupNotice">
+      <strong>⚠ Pop-up Blocked</strong>
+      Your browser blocked the new tab. To fix this:
+      <ol>
+        <li>Look for the blocked pop-up icon in your browser's address bar</li>
+        <li>Click it and choose <em>"Always allow pop-ups from this site"</em></li>
+        <li>Then click Search again</li>
+      </ol>
+      Or open the results directly (will show URL in history):
+      <br>
+      <a id="directLink" href="#" target="_blank">Open Results Directly →</a>
+    </div>
+
+    <!-- Search bar -->
+    <div class="search-wrapper">
+      <div class="input-group">
+        <span class="input-icon">🔍</span>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="What are you searching for?"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          autofocus
+          aria-label="Search query"
+        />
+      </div>
+      <button id="searchBtn" aria-label="Search privately">
+        Search →
+      </button>
+    </div>
+
+    <p class="kbd-hint">Press <kbd>Enter</kbd> to search</p>
+
+    <!-- Info row -->
+    <div class="info-row">
+      <div class="info-item"><span class="dot"></span> No history</div>
+      <div class="info-item"><span class="dot"></span> DuckDuckGo powered</div>
+      <div class="info-item"><span class="dot"></span> Vercel proxied</div>
+    </div>
+
+  </div>
+
+  <script>
+    // ──────────────────────────────────────────────────────────────────────────
+    // CORE LOGIC: The About:Blank Cloaking Search
+    // ──────────────────────────────────────────────────────────────────────────
+    // This is the heart of the entire system. Read carefully.
+
+    const input       = document.getElementById("searchInput");
+    const btn         = document.getElementById("searchBtn");
+    const popupNotice = document.getElementById("popupNotice");
+    const directLink  = document.getElementById("directLink");
+
+    // The HTML string for the "loading" screen written into the blank tab
+    // while we fetch the actual results. This appears instantly.
+    function buildLoadingPage(query) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Searching...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #080b10;
+      color: #4a5568;
+      font-family: 'JetBrains Mono', monospace, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 16px;
+    }
+    .ring {
+      width: 32px; height: 32px;
+      border: 2px solid #1e2533;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .label { font-size: 13px; letter-spacing: 0.05em; }
+    .query { color: #2e3748; font-size: 11px; max-width: 400px; text-align: center; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="ring"></div>
+  <div class="label">Fetching results privately...</div>
+  <div class="query">${query.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+</body>
+</html>`;
+    }
+
+    // The HTML written into the blank tab on fetch error
+    function buildErrorPage(message) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Error</title>
+  <style>
+    body { background:#080b10; color:#f87171; font-family:monospace; padding:2rem; }
+    h2 { margin-bottom:1rem; }
+    pre { background:#0e1117; border:1px solid #1e2533; padding:1rem; border-radius:8px; color:#9ca3af; font-size:12px; white-space:pre-wrap; }
+    button { margin-top:1rem; padding:8px 16px; background:#1e2533; color:#c9d3e0; border:1px solid #2e3d58; border-radius:6px; cursor:pointer; font-family:monospace; }
+  </style>
+</head>
+<body>
+  <h2>⚠ Proxy Error</h2>
+  <pre>${String(message).replace(/</g,"&lt;")}</pre>
+  <button onclick="window.close()">Close Tab</button>
+</body>
+</html>`;
+    }
+
+    async function doSearch() {
+      const query = input.value.trim();
+      if (!query) {
+        input.focus();
+        input.style.borderColor = "#ef4444";
+        setTimeout(() => { input.style.borderColor = ""; }, 1200);
+        return;
+      }
+
+      // Hide any previous popup warning
+      popupNotice.style.display = "none";
+
+      // Build the proxy URL — same-origin, so fetch() needs no CORS
+      const proxyUrl = "/api/proxy?q=" + encodeURIComponent(query);
+
+      // ── STEP 1: OPEN THE WINDOW SYNCHRONOUSLY ─────────────────────────────
+      // THIS IS THE CRITICAL STEP.
+      //
+      // window.open() MUST be called here, synchronously, inside the event
+      // handler. NOT inside a .then(), NOT inside a setTimeout(), NOT inside
+      // any async callback. Browsers enforce a rule: window.open() is only
+      // allowed to create a new tab if it's called as a direct result of a
+      // user gesture (click, keydown). The moment you cross an async boundary
+      // (a Promise, a fetch, a setTimeout), the browser considers the call
+      // "not user-initiated" and blocks it.
+      //
+      // By calling it here — before the fetch even begins — we are guaranteed
+      // to be inside the synchronous click/keydown handler.
+      //
+      // The second argument "" means "no URL" → the tab opens as about:blank.
+      // The third argument is window features — we don't set any to keep the
+      // window looking like a normal tab.
+      const newWin = window.open("", "_blank");
+
+      // ── STEP 2: CHECK IF THE POPUP WAS BLOCKED ───────────────────────────
+      // If window.open() returns null, or returns a closed window, the browser
+      // blocked it. We show the inline warning with a fallback link.
+      if (!newWin || newWin.closed || typeof newWin.document === "undefined") {
+        directLink.href = proxyUrl;
+        popupNotice.style.display = "block";
+        popupNotice.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
+
+      // ── STEP 3: WRITE A LOADING SCREEN IMMEDIATELY ───────────────────────
+      // The new tab exists but is blank. We write a loading screen into it
+      // right now — before the fetch — so the user sees immediate feedback
+      // rather than a confusing empty white tab.
+      //
+      // document.open() resets the document to a writable state.
+      // document.write() injects the HTML string.
+      // document.close() signals that writing is finished and triggers parsing.
+      newWin.document.open();
+      newWin.document.write(buildLoadingPage(query));
+      newWin.document.close();
+
+      // ── STEP 4: DISABLE BUTTON TO PREVENT DOUBLE-SUBMIT ──────────────────
+      btn.disabled = true;
+      btn.textContent = "Fetching...";
+
+      // ── STEP 5: FETCH PROXIED RESULTS ─────────────────────────────────────
+      // Now we can do the async work. The window is already open (step 1),
+      // so the browser has no reason to block anything from here on.
+      try {
+        const response = await fetch(proxyUrl, {
+          method: "GET",
+          headers: { "Accept": "text/html" },
+          credentials: "omit",
+        });
+
+        if (!response.ok) {
+          throw new Error("Server responded with HTTP " + response.status);
+        }
+
+        const html = await response.text();
+
+        // ── STEP 6: WRITE REAL RESULTS INTO THE TAB ────────────────────────
+        // We check newWin.closed first — the user might have closed the tab
+        // while the fetch was in progress. Writing to a closed window throws.
+        if (newWin.closed) {
+          console.warn("User closed the result tab before results arrived.");
+          return;
+        }
+
+        newWin.document.open();
+        newWin.document.write(html);
+        newWin.document.close();
+        // At this point: the tab shows real DuckDuckGo results.
+        // The URL bar still shows "about:blank". No history entry is created.
+
+      } catch (err) {
+        // If an error occurred, write an error page into the tab
+        console.error("Proxy fetch failed:", err);
+        if (!newWin.closed) {
+          newWin.document.open();
+          newWin.document.write(buildErrorPage(err.message));
+          newWin.document.close();
+        }
+      } finally {
+        // Re-enable the button regardless of success or failure
+        btn.disabled = false;
+        btn.textContent = "Search →";
+      }
+    }
+
+    // ── Event Listeners ────────────────────────────────────────────────────
+    btn.addEventListener("click", doSearch);
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doSearch();
+      }
+    });
+
+    // Reset red border on input
+    input.addEventListener("input", function () {
+      input.style.borderColor = "";
+    });
+  </script>
+</body>
+</html>
