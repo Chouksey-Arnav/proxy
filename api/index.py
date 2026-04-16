@@ -1,35 +1,36 @@
-from http.server import BaseHTTPRequestHandler
+from flask import Flask, request, Response
 import requests
-from urllib.parse import urlparse, parse_qs
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        query_params = parse_qs(urlparse(self.path).query)
-        search_query = query_params.get('q', [None])[0]
+app = Flask(__name__)
 
-        if not search_query:
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(b"Ready. Append ?q=search to the URL.")
-            return
+@app.route('/api/proxy')
+def proxy():
+    query = request.args.get('q')
+    if not query:
+        return "No query provided. Append ?q=search to the URL.", 400
 
-        url = f"https://html.duckduckgo.com/html/?q={search_query}"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    # DuckDuckGo HTML endpoint
+    url = f"https://html.duckduckgo.com/html/?q={query}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        content = res.text
         
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            # This fixes the links inside the DuckDuckGo results
-            content = response.text.replace('href="/html', 'href="https://html.duckduckgo.com/html')
-            content = content.replace('src="/', 'src="https://duckduckgo.com/')
+        # FIXING LINKS: This ensures that when you click a result, it doesn't break
+        content = content.replace('href="/html', 'href="https://html.duckduckgo.com/html')
+        content = content.replace('src="/', 'src="https://duckduckgo.com/')
+        
+        # Create response and inject security headers to allow the about:blank iframe
+        response = Response(content, mimetype='text/html')
+        response.headers['Content-Security-Policy'] = "frame-ancestors *"
+        response.headers['X-Frame-Options'] = "ALLOWALL"
+        return response
+    except Exception as e:
+        return f"Proxy Error: {str(e)}", 500
 
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html; charset=utf-8')
-            # Critical: Allows the content to show up inside the iframe
-            self.send_header('Content-Security-Policy', "frame-ancestors *")
-            self.end_headers()
-            self.wfile.write(content.encode('utf-8'))
-        except Exception as e:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Error: {str(e)}".encode())
+# Vercel needs this
+def handler(request):
+    return app(request)
