@@ -1,14 +1,6 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/proxy", "destination": "/api/proxy.py" }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Content-Security-Policy", "value": "frame-ancestors *" }
-      ]
-    }
+    { "source": "/api/proxy", "destination": "/api/index.py" }
   ]
 }
