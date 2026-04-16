@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Private Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #21262d;
+      --border-hi: #388bfd;
+      --text: #c9d1d9;
+      --muted: #484f58;
+      --accent: #388bfd;
+      --accent-h: #1f6feb;
+      --glow: rgba(56,139,253,.12);
+      --warn-bg: #161007;
+      --warn-bd: #9e6a03;
+      --warn-tx: #e3b341;
+      --red: #f85149;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    /* faint grid bg */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 560px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+    }
+
+    /* top badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #58a6ff;
+      background: rgba(56,139,253,.1);
+      border: 1px solid rgba(56,139,253,.25);
+      border-radius: 999px;
+      padding: 4px 12px;
+      margin-bottom: 1.6rem;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      background: #3fb950;
+      border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2rem, 5.5vw, 2.8rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.08;
+      color: #f0f6fc;
+      margin-bottom: .5rem;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(120deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .sub {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+
+    /* search row */
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: .75rem;
+    }
+
+    .input-wrap {
+      position: relative;
+      flex: 1;
+    }
+    .input-wrap svg {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: var(--muted);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      height: 48px;
+      padding: 0 14px 0 40px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .18s, box-shadow .18s;
+    }
+    input[type="text"]::placeholder { color: var(--muted); }
+    input[type="text"]:focus {
+      border-color: var(--border-hi);
+      box-shadow: 0 0 0 3px var(--glow);
+    }
+    input.shake {
+      animation: shake .3s ease;
+      border-color: var(--red) !important;
+    }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}
+      25%{transform:translateX(-5px)}
+      75%{transform:translateX(5px)}
+    }
+
+    button#go {
+      height: 48px;
+      padding: 0 20px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: .05em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, box-shadow .15s, transform .1s;
+    }
+    button#go:hover  { background: var(--accent-h); box-shadow: 0 4px 16px rgba(56,139,253,.35); }
+    button#go:active { transform: scale(.97); }
+    button#go:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    /* hint */
+    .hint {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    kbd {
+      padding: 2px 5px;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-size: 9px;
+      background: #161b22;
+    }
+
+    /* popup warning */
+    .warn {
+      display: none;
+      padding: 14px;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-bd);
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--warn-tx);
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+    .warn b { display: block; margin-bottom: 4px; font-size: 12px; }
+    .warn ol { margin: 6px 0 10px 16px; color: #d29922; }
+    .fallback {
+      display: inline-block;
+      padding: 5px 12px;
+      background: #5a3e00;
+      border: 1px solid var(--warn-bd);
+      border-radius: 6px;
+      color: #ffd666;
+      font-size: 11px;
+      text-decoration: none;
+    }
+    .fallback:hover { background: #7a5500; }
+
+    /* stats row */
+    .stats {
+      display: flex;
+      gap: 20px;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+    .stat { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .stat .ok { color: #3fb950; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="badge"><span class="dot"></span>Proxy active</div>
+
+  <h1><em>Private</em><br>Search</h1>
+  <p class="sub">
+    Results open in an <code>about:blank</code> tab — never recorded in history.<br>
+    Powered by DuckDuckGo, routed through a Vercel serverless proxy.
+  </p>
+
+  <div class="warn" id="warn">
+    <b>⚠ Pop-up Blocked</b>
+    Your browser blocked the new tab. Fix it in 3 steps:
+    <ol>
+      <li>Find the blocked pop-up icon in your address bar</li>
+      <li>Click it → <em>"Always allow pop-ups from this site"</em></li>
+      <li>Search again</li>
+    </ol>
+    Or open the results directly (URL will appear in history):<br>
+    <a id="fallback" class="fallback" href="#" target="_blank">Open Results Directly →</a>
+  </div>
+
+  <div class="row">
+    <div class="input-wrap">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="q" placeholder="Search privately..." autocomplete="off" autofocus>
+    </div>
+    <button id="go">Search →</button>
+  </div>
+  <p class="hint">Press <kbd>Enter</kbd> to search</p>
+
+  <div class="stats">
+    <div class="stat"><span class="ok">✓</span> No history</div>
+    <div class="stat"><span class="ok">✓</span> DuckDuckGo</div>
+    <div class="stat"><span class="ok">✓</span> Serverless proxy</div>
+  </div>
+</div>
+
+<script>
+  "use strict";
+
+  var input    = document.getElementById("q");
+  var btn      = document.getElementById("go");
+  var warn     = document.getElementById("warn");
+  var fallback = document.getElementById("fallback");
+
+  // ─── LOADING PAGE (written into the blank tab while fetch runs) ───────────
+  function loadingHTML(q) {
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Searching\u2026</title>'
+      + '<style>*{margin:0;padding:0;box-sizing:border-box}'
+      + 'body{background:#0d1117;color:#484f58;font-family:monospace;display:flex;'
+      + 'flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:14px}'
+      + '.ring{width:28px;height:28px;border:2px solid #21262d;border-top-color:#388bfd;'
+      + 'border-radius:50%;animation:spin .7s linear infinite}'
+      + '@keyframes spin{to{transform:rotate(360deg)}}'
+      + '.lbl{font-size:12px;letter-spacing:.06em}'
+      + '.q{font-size:10px;color:#30363d;max-width:360px;text-align:center;word-break:break-word}'
+      + '</style></head><body>'
+      + '<div class="ring"></div>'
+      + '<div class="lbl">Fetching results privately\u2026</div>'
+      + '<div class="q">' + q.replace(/</g,"&lt;").replace(/>/g,"&gt;") + '</div>'
+      + '</body></html>';
+  }
+
+  // ─── ERROR PAGE ───────────────────────────────────────────────────────────
+  function errorHTML(msg) {
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Error</title>'
+      + '<style>body{background:#0d1117;color:#f85149;font-family:monospace;padding:2rem}'
+      + 'pre{background:#161b22;border:1px solid #21262d;padding:1rem;border-radius:8px;'
+      + 'color:#8b949e;font-size:11px;white-space:pre-wrap;margin-top:1rem}'
+      + 'button{margin-top:1rem;padding:7px 14px;background:#161b22;color:#c9d1d9;'
+      + 'border:1px solid #30363d;border-radius:6px;cursor:pointer;font-family:monospace}'
+      + '</style></head><body><h2>Proxy Error</h2>'
+      + '<pre>' + String(msg).replace(/</g,"&lt;") + '</pre>'
+      + '<button onclick="window.close()">Close Tab</button>'
+      + '</body></html>';
+  }
+
+  // ─── MAIN SEARCH FUNCTION ─────────────────────────────────────────────────
+  function doSearch() {
+    var q = input.value.trim();
+
+    // Empty query — shake the input box
+    if (!q) {
+      input.classList.add("shake");
+      input.addEventListener("animationend", function () {
+        input.classList.remove("shake");
+      }, { once: true });
+      input.focus();
+      return;
+    }
+
+    warn.style.display = "none";
+
+    var proxyUrl = "/api/proxy?q=" + encodeURIComponent(q);
+
+    // ── STEP 1: Open about:blank tab SYNCHRONOUSLY ────────────────────────
+    //
+    // CRITICAL RULE: window.open() MUST be called here, as the very first
+    // statement in this function, before ANY async code. Browsers permit
+    // window.open() only when called synchronously within a user-gesture
+    // event handler (click / keydown). The moment the JS engine crosses any
+    // async boundary — a fetch, a Promise.then, a setTimeout — the "user
+    // gesture token" is consumed and window.open() is blocked.
+    //
+    // By calling it at the top of this synchronous function, we are always
+    // within the gesture. The window opens as about:blank. The URL bar will
+    // show "about:blank" permanently — the browser never records this in history.
+    var win = window.open("", "_blank");
+
+    // ── STEP 2: Check for popup blocker ──────────────────────────────────
+    if (!win || win.closed) {
+      fallback.href = proxyUrl;
+      warn.style.display = "block";
+      warn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+
+    // ── STEP 3: Write loading screen into the blank tab immediately ───────
+    win.document.open();
+    win.document.write(loadingHTML(q));
+    win.document.close();
+
+    // ── STEP 4: Disable button, start async fetch ────────────────────────
+    btn.disabled = true;
+    btn.textContent = "Loading\u2026";
+
+    fetch(proxyUrl, { method: "GET", credentials: "omit" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status + " from proxy");
+        return res.text();
+      })
+      .then(function (html) {
+        // ── STEP 5: Write real results into the open tab ─────────────────
+        // The tab is already open (step 1). We're just replacing its content.
+        // about:blank stays in the URL bar. No history entry is created.
+        if (win.closed) return; // user closed tab during fetch
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+      })
+      .catch(function (err) {
+        if (!win.closed) {
+          win.document.open();
+          win.document.write(errorHTML(err.message));
+          win.document.close();
+        }
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Search \u2192";
+      });
+  }
+
+  btn.addEventListener("click", doSearch);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); doSearch(); }
+  });
+</script>
+</body>
+</html>
