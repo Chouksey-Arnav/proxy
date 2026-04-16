@@ -1,48 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Search Portal</title>
+    <title>Private Search</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #121212; color: white; }
-        h1 { margin-bottom: 20px; font-weight: 300; }
-        button { padding: 15px 35px; font-size: 1.2rem; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 8px; transition: 0.3s; box-shadow: 0 4px 14px 0 rgba(0,118,255,0.39); }
-        button:hover { background: #0051ad; transform: translateY(-2px); }
+        body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: white; }
+        .container { text-align: center; }
+        button { padding: 15px 30px; font-size: 1.1rem; cursor: pointer; background: #0070f3; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>Private Search Proxy</h1>
-    <button onclick="launch()">Launch Cloaked Search</button>
+    <div class="container">
+        <h1>Proxy Launcher</h1>
+        <button onclick="launch()">Start Private Search</button>
+    </div>
 
     <script>
         function launch() {
-            const query = prompt("What are you looking for?");
-            if (!query) return;
+            const q = prompt("Search Query:");
+            if (!q) return;
 
-            // 1. Open the about:blank tab
             const win = window.open('about:blank', '_blank');
             if (!win) {
-                alert("POP-UP BLOCKED! Look at your URL bar and click 'Allow pop-ups' to use this proxy.");
+                alert("Please allow pop-ups for this site!");
                 return;
             }
 
-            // 2. Build the URL to your Vercel API
-            const proxyUrl = window.location.origin + "/api/proxy?q=" + encodeURIComponent(query);
-            
-            // 3. Style the new tab and inject the iframe
+            // This builds the full URL to your Vercel proxy
+            const target = window.location.origin + "/api/proxy?q=" + encodeURIComponent(q);
+
             win.document.body.style.margin = '0';
             win.document.body.style.height = '100vh';
-            win.document.title = "New Tab"; // Generic title for history
-
-            const iframe = win.document.createElement('iframe');
-            iframe.src = proxyUrl;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
             
-            win.document.body.appendChild(iframe);
+            const frame = win.document.createElement('iframe');
+            frame.src = target;
+            frame.style.width = '100%';
+            frame.style.height = '100%';
+            frame.style.border = 'none';
             
-            // Optional: Hide the launcher page by sending it to Google
-            // window.location.href = "https://www.google.com";
+            win.document.body.appendChild(frame);
         }
     </script>
 </body>
